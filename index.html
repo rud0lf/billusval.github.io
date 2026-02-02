@@ -171,7 +171,7 @@
             fill="#ff7aa2"/>
     </svg>
 
-    <h1>Saumya will you be my valentine?</h1>
+    <h2>Hi Saumya! Will you be my valentine? <3 </h2>
 
     <section class="button-zone" id="zone">
       <button id="yesBtn">Yes</button>
@@ -255,6 +255,7 @@
       return Math.max(min, Math.min(max, n));
     }
 
+/*
     function moveNo(px, py) {
       const z = zone.getBoundingClientRect();
       const b = noBtn.getBoundingClientRect();
@@ -277,17 +278,139 @@
 
       growYes();
     }
+*/
+/* ---------- NO BUTTON RUNS AWAY (FINAL, DIAGONAL OVERLAP) ---------- */
 
-    zone.addEventListener("pointermove", e => {
-      const b = noBtn.getBoundingClientRect();
-      const d = Math.hypot(
-        (b.left + b.width / 2) - e.clientX,
-        (b.top + b.height / 2) - e.clientY
-      );
-      if (d < 140) moveNo(e.clientX, e.clientY);
-    });
+let lastMouseX = null;
+let lastMouseY = null;
+let yesGrown = false;
 
-    noBtn.addEventListener("click", e => e.preventDefault());
+function clamp(n, min, max) {
+  return Math.max(min, Math.min(max, n));
+}
+
+/* ---------- YES BUTTON PROXIMITY ---------- */
+function updateYesProximity(mouseX, mouseY) {
+  const y = yesBtn.getBoundingClientRect();
+  const cx = y.left + y.width / 2;
+  const cy = y.top  + y.height / 2;
+
+  const d = Math.hypot(cx - mouseX, cy - mouseY);
+
+  if (d < 100 && !yesGrown) {
+    yesBtn.style.transform = "scale(1.3)";
+    yesGrown = true;
+  }
+
+  if (d >= 100 && yesGrown) {
+    yesBtn.style.transform = "scale(1)";
+    yesGrown = false;
+  }
+}
+
+/* ---------- NO BUTTON MOVEMENT ---------- */
+function moveNo(mouseX, mouseY, prevMouseX, prevMouseY) {
+  const z = zone.getBoundingClientRect();
+  const b = noBtn.getBoundingClientRect();
+  const y = yesBtn.getBoundingClientRect();
+
+  const startLeft = b.left - z.left;
+  const startTop  = b.top  - z.top;
+
+  // Direction mouse is approaching FROM (mouse velocity)
+  let ax = mouseX - prevMouseX;
+  let ay = mouseY - prevMouseY;
+  let mag = Math.hypot(ax, ay) || 1;
+  ax /= mag;
+  ay /= mag;
+
+  // ---- Attempt 1: move 50px in approach direction ----
+  let newLeft = startLeft + ax * 50;
+  let newTop  = startTop  + ay * 50;
+
+  newLeft = clamp(newLeft, 0, z.width  - b.width);
+  newTop  = clamp(newTop,  0, z.height - b.height);
+
+  const moved =
+    Math.abs(newLeft - startLeft) > 1 ||
+    Math.abs(newTop  - startTop)  > 1;
+
+  // ---- Attempt 2: blocked → move 100px opposite direction ----
+  if (!moved) {
+    newLeft = startLeft - ax * 100;
+    newTop  = startTop  - ay * 100;
+
+    newLeft = clamp(newLeft, 0, z.width  - b.width);
+    newTop  = clamp(newTop,  0, z.height - b.height);
+
+    ax = -ax;
+    ay = -ay; // update movement direction
+  }
+
+  /* ---------- DIAGONAL OVERLAP CHECK WITH YES ---------- */
+  const noCX = newLeft + b.width / 2;
+  const noCY = newTop  + b.height / 2;
+
+  const yesCX = (y.left - z.left) + y.width / 2;
+  const yesCY = (y.top  - z.top)  + y.height / 2;
+
+  // Diagonal lengths
+  const noDiag  = Math.hypot(b.width, b.height);
+  const yesDiag = Math.hypot(y.width, y.height);
+
+  const dx = noCX - yesCX;
+  const dy = noCY - yesCY;
+  const dist = Math.hypot(dx, dy) || 1;
+
+  const minDist = (noDiag / 2) + (yesDiag / 2);
+
+  if (dist < minDist) {
+    const push = minDist - dist;
+    newLeft += ax * push;
+    newTop  += ay * push;
+
+    newLeft = clamp(newLeft, 0, z.width  - b.width);
+    newTop  = clamp(newTop,  0, z.height - b.height);
+  }
+
+  // Apply final position
+  noBtn.style.left = newLeft + "px";
+  noBtn.style.top  = newTop  + "px";
+  noBtn.style.transform = "none";
+}
+
+/* ---------- POINTER TRACKING ---------- */
+zone.addEventListener("pointermove", e => {
+  updateYesProximity(e.clientX, e.clientY);
+
+  if (lastMouseX === null) {
+    lastMouseX = e.clientX;
+    lastMouseY = e.clientY;
+    return;
+  }
+
+  const b = noBtn.getBoundingClientRect();
+  const cx = b.left + b.width  / 2;
+  const cy = b.top  + b.height / 2;
+
+  const d = Math.hypot(cx - e.clientX, cy - e.clientY);
+
+  if (d < 50) {
+    moveNo(
+      e.clientX,
+      e.clientY,
+      lastMouseX,
+      lastMouseY
+    );
+  }
+
+  lastMouseX = e.clientX;
+  lastMouseY = e.clientY;
+});
+
+/* ---------- SAFETY ---------- */
+noBtn.addEventListener("click", e => e.preventDefault());
+
 
     /* ---------- YES CLICK ---------- */
     yesBtn.addEventListener("click", () => {
