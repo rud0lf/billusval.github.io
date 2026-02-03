@@ -419,7 +419,7 @@ noBtn.addEventListener("touchstart", e => {
 
   const startLeft = b.left - z.left;
   const startTop  = b.top - z.top;
-  const distance = 100; // move 100px
+  const distance = 100;
 
   let newLeft, newTop;
   let attempts = 0;
@@ -429,34 +429,43 @@ noBtn.addEventListener("touchstart", e => {
     const ax = Math.cos(angle);
     const ay = Math.sin(angle);
 
+    // tentative new position
     newLeft = startLeft + ax * distance;
     newTop  = startTop + ay * distance;
 
+    // clamp inside container
     newLeft = clamp(newLeft, 0, z.width - b.width);
     newTop  = clamp(newTop, 0, z.height - b.height);
 
-    // Check diagonal overlap
+    // diagonal overlap check
     const noCX = newLeft + b.width / 2;
     const noCY = newTop + b.height / 2;
-
     const yesCX = (y.left - z.left) + y.width / 2;
     const yesCY = (y.top - z.top) + y.height / 2;
 
     const dx = noCX - yesCX;
     const dy = noCY - yesCY;
     const dist = Math.hypot(dx, dy) || 1;
-
     const minDist = computeMinDist(b, y);
 
     attempts++;
-    if (attempts > 50) break; // safety fallback
+    // if not overlapping, exit loop
+    if (dist >= minDist) break;
 
-  } while (dist < minDist);
+    // safety fallback: reduce distance slightly
+    if (attempts > 50) {
+      newLeft = clamp(startLeft - ax * 50, 0, z.width - b.width);
+      newTop  = clamp(startTop - ay * 50, 0, z.height - b.height);
+      break;
+    }
+
+  } while (true);
 
   noBtn.style.left = newLeft + "px";
   noBtn.style.top  = newTop + "px";
   noBtn.style.transform = "none";
 });
+
 
 /* ---------- SAFETY ---------- */
 noBtn.addEventListener("click", e => e.preventDefault());
