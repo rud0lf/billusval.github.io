@@ -279,7 +279,7 @@
       growYes();
     }
 */
-/* ---------- NO BUTTON RUNS AWAY (FINAL, DIAGONAL OVERLAP) ---------- */
+/* ---------- NO BUTTON RUNS AWAY (FINAL MOBILE-FRIENDLY) ---------- */
 
 let lastMouseX = null;
 let lastMouseY = null;
@@ -308,6 +308,13 @@ function updateYesProximity(mouseX, mouseY) {
   }
 }
 
+/* ---------- DIAGONAL DISTANCE ---------- */
+function computeMinDist(noRect, yesRect) {
+  const noDiag  = Math.hypot(noRect.width, noRect.height);
+  const yesDiag = Math.hypot(yesRect.width, yesRect.height);
+  return (noDiag / 2) + (yesDiag / 2);
+}
+
 /* ---------- NO BUTTON MOVEMENT ---------- */
 function moveNo(mouseX, mouseY, prevMouseX, prevMouseY) {
   const z = zone.getBoundingClientRect();
@@ -317,65 +324,59 @@ function moveNo(mouseX, mouseY, prevMouseX, prevMouseY) {
   const startLeft = b.left - z.left;
   const startTop  = b.top  - z.top;
 
-  // Direction mouse is approaching FROM (mouse velocity)
+  // Direction mouse is approaching
   let ax = mouseX - prevMouseX;
   let ay = mouseY - prevMouseY;
   let mag = Math.hypot(ax, ay) || 1;
   ax /= mag;
   ay /= mag;
 
-  // ---- Attempt 1: move 50px in approach direction ----
+  // Attempt 1: move 50px along approach direction
   let newLeft = startLeft + ax * 50;
   let newTop  = startTop  + ay * 50;
 
-  newLeft = clamp(newLeft, 0, z.width  - b.width);
-  newTop  = clamp(newTop,  0, z.height - b.height);
+  newLeft = clamp(newLeft, 0, z.width - b.width);
+  newTop  = clamp(newTop, 0, z.height - b.height);
 
   const moved =
     Math.abs(newLeft - startLeft) > 1 ||
-    Math.abs(newTop  - startTop)  > 1;
+    Math.abs(newTop  - startTop) > 1;
 
-  // ---- Attempt 2: blocked → move 100px opposite direction ----
+  // Attempt 2: blocked → move 100px opposite
   if (!moved) {
     newLeft = startLeft - ax * 100;
-    newTop  = startTop  - ay * 100;
+    newTop  = startTop - ay * 100;
 
-    newLeft = clamp(newLeft, 0, z.width  - b.width);
-    newTop  = clamp(newTop,  0, z.height - b.height);
+    newLeft = clamp(newLeft, 0, z.width - b.width);
+    newTop  = clamp(newTop, 0, z.height - b.height);
 
     ax = -ax;
-    ay = -ay; // update movement direction
+    ay = -ay;
   }
 
-  /* ---------- DIAGONAL OVERLAP CHECK WITH YES ---------- */
+  // ---------- DIAGONAL OVERLAP CHECK ----------
   const noCX = newLeft + b.width / 2;
-  const noCY = newTop  + b.height / 2;
+  const noCY = newTop + b.height / 2;
 
   const yesCX = (y.left - z.left) + y.width / 2;
-  const yesCY = (y.top  - z.top)  + y.height / 2;
-
-  // Diagonal lengths
-  const noDiag  = Math.hypot(b.width, b.height);
-  const yesDiag = Math.hypot(y.width, y.height);
+  const yesCY = (y.top - z.top) + y.height / 2;
 
   const dx = noCX - yesCX;
   const dy = noCY - yesCY;
   const dist = Math.hypot(dx, dy) || 1;
-
-  const minDist = (noDiag / 2) + (yesDiag / 2);
+  const minDist = computeMinDist(b, y);
 
   if (dist < minDist) {
     const push = minDist - dist;
     newLeft += ax * push;
     newTop  += ay * push;
 
-    newLeft = clamp(newLeft, 0, z.width  - b.width);
-    newTop  = clamp(newTop,  0, z.height - b.height);
+    newLeft = clamp(newLeft, 0, z.width - b.width);
+    newTop  = clamp(newTop, 0, z.height - b.height);
   }
 
-  // Apply final position
   noBtn.style.left = newLeft + "px";
-  noBtn.style.top  = newTop  + "px";
+  noBtn.style.top  = newTop + "px";
   noBtn.style.transform = "none";
 }
 
@@ -390,8 +391,8 @@ zone.addEventListener("pointermove", e => {
   }
 
   const b = noBtn.getBoundingClientRect();
-  const cx = b.left + b.width  / 2;
-  const cy = b.top  + b.height / 2;
+  const cx = b.left + b.width / 2;
+  const cy = b.top + b.height / 2;
 
   const d = Math.hypot(cx - e.clientX, cy - e.clientY);
 
@@ -406,6 +407,55 @@ zone.addEventListener("pointermove", e => {
 
   lastMouseX = e.clientX;
   lastMouseY = e.clientY;
+});
+
+/* ---------- TOUCH / MOBILE LOGIC ---------- */
+noBtn.addEventListener("touchstart", e => {
+  e.preventDefault();
+
+  const z = zone.getBoundingClientRect();
+  const b = noBtn.getBoundingClientRect();
+  const y = yesBtn.getBoundingClientRect();
+
+  const startLeft = b.left - z.left;
+  const startTop  = b.top - z.top;
+  const distance = 100; // move 100px
+
+  let newLeft, newTop;
+  let attempts = 0;
+
+  do {
+    const angle = Math.random() * 2 * Math.PI;
+    const ax = Math.cos(angle);
+    const ay = Math.sin(angle);
+
+    newLeft = startLeft + ax * distance;
+    newTop  = startTop + ay * distance;
+
+    newLeft = clamp(newLeft, 0, z.width - b.width);
+    newTop  = clamp(newTop, 0, z.height - b.height);
+
+    // Check diagonal overlap
+    const noCX = newLeft + b.width / 2;
+    const noCY = newTop + b.height / 2;
+
+    const yesCX = (y.left - z.left) + y.width / 2;
+    const yesCY = (y.top - z.top) + y.height / 2;
+
+    const dx = noCX - yesCX;
+    const dy = noCY - yesCY;
+    const dist = Math.hypot(dx, dy) || 1;
+
+    const minDist = computeMinDist(b, y);
+
+    attempts++;
+    if (attempts > 50) break; // safety fallback
+
+  } while (dist < minDist);
+
+  noBtn.style.left = newLeft + "px";
+  noBtn.style.top  = newTop + "px";
+  noBtn.style.transform = "none";
 });
 
 /* ---------- SAFETY ---------- */
